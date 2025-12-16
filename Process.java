@@ -1,5 +1,8 @@
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.Comparator;
 
 public class Process {
 
@@ -105,4 +108,104 @@ public class Process {
         System.out.println("TAT = " + p.turnaroundTime);
     }
 
+}
+
+class AGScheduler {
+
+    private final List<Process> processes;
+    private final Queue<Process> readyQueue = new LinkedList<>();
+    private final List<String> executionOrder = new ArrayList<>();
+
+    AGScheduler(List<Process> processes) {
+        this.processes = processes;
+    }
+
+    void run() {
+        int currentTime = 0;
+        int completed = 0;
+
+        processes.sort(Comparator.comparingInt(p -> p.arrivalTime));
+        int index = 0;
+
+        while (completed < processes.size()) {
+
+            // Add arrived processes to ready queue
+            while (index < processes.size() &&
+                   processes.get(index).arrivalTime <= currentTime) {
+                readyQueue.add(processes.get(index));
+                index++;
+            }
+
+            // CPU idle
+            if (readyQueue.isEmpty()) {
+                currentTime++;
+                continue;
+            }
+
+            Process current = readyQueue.poll();
+            executionOrder.add(current.name);
+
+            int q = current.quantum;
+            int q25 = (int) Math.ceil(q * 0.25);
+            int q50 = (int) Math.ceil(q * 0.50);
+
+            // -------- First 25% (FCFS) --------
+            int exec = Math.min(q25, current.remainingTime);
+            current.executeFor(exec, currentTime);
+            currentTime += exec;
+
+            if (current.isFinished()) {
+                completed++;
+                continue;
+            }
+
+            // -------- Second 25% (Priority) --------
+            boolean preempted = false;
+            for (Process p : readyQueue) {
+                if (!p.isFinished() && p.priority < current.priority) {
+                    int remaining = q - exec;
+                    current.updateQuantum(q + (int) Math.ceil(remaining / 2.0));
+                    readyQueue.add(current);
+                    preempted = true;
+                    break;
+                }
+            }
+            if (preempted) continue;
+
+            exec = Math.min(q50 - q25, current.remainingTime);
+            current.executeFor(exec, currentTime);
+            currentTime += exec;
+
+            if (current.isFinished()) {
+                completed++;
+                continue;
+            }
+
+            // -------- Remaining Quantum (Preemptive SJF) --------
+            for (Process p : readyQueue) {
+                if (!p.isFinished() && p.remainingTime < current.remainingTime) {
+                    current.updateQuantum(q + (q - q50));
+                    readyQueue.add(current);
+                    preempted = true;
+                    break;
+                }
+            }
+            if (preempted) continue;
+
+            exec = Math.min(q - q50, current.remainingTime);
+            current.executeFor(exec, currentTime);
+            currentTime += exec;
+
+            if (current.isFinished()) {
+                completed++;
+            } else {
+                current.updateQuantum(q + 2);
+                readyQueue.add(current);
+            }
+        }
+    }
+
+    List<String> getExecutionOrder() {
+        return executionOrder;
+    }
 }
