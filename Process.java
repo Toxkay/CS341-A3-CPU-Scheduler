@@ -110,102 +110,146 @@ public class Process {
 
 }
 
-class AGScheduler {
+class AGScheduler { 
 
-    private final List<Process> processes;
-    private final Queue<Process> readyQueue = new LinkedList<>();
-    private final List<String> executionOrder = new ArrayList<>();
+    private List<Process> processes;
+    private List<String> executionOrder;
 
-    AGScheduler(List<Process> processes) {
+    public AGScheduler(List<Process> processes) {
         this.processes = processes;
+        this.executionOrder = new ArrayList<>();
     }
 
-    void run() {
-        int currentTime = 0;
-        int completed = 0;
-
+    public void run() {
+        // Sort by Arrival Time first
         processes.sort(Comparator.comparingInt(p -> p.arrivalTime));
-        int index = 0;
 
-        while (completed < processes.size()) {
+        Queue<Process> readyQueue = new LinkedList<>();
+        List<Process> completed = new ArrayList<>();
+        
+        // Helper to manage arrivals
+        List<Process> pendingArrivals = new ArrayList<>(processes);
+        
+        int currentTime = 0;
+        int timeInCurrentQuantum = 0;
+        Process currentProcess = null;
 
-            // Add arrived processes to ready queue
-            while (index < processes.size() &&
-                   processes.get(index).arrivalTime <= currentTime) {
-                readyQueue.add(processes.get(index));
-                index++;
+        while (completed.size() < processes.size()) {
+
+            // A. Handle Arrivals
+            // Add any process that has arrived by 'currentTime' to the ready queue
+            Iterator<Process> it = pendingArrivals.iterator();
+            while (it.hasNext()) {
+                Process p = it.next();
+                if (p.arrivalTime <= currentTime) {
+                    readyQueue.add(p);
+                    it.remove();
+                } else {
+                    break; 
+                }
             }
 
-            // CPU idle
-            if (readyQueue.isEmpty()) {
-                currentTime++;
+            // B. CPU Load
+            if (currentProcess == null) {
+                if (!readyQueue.isEmpty()) {
+                    currentProcess = readyQueue.poll();
+                    timeInCurrentQuantum = 0;
+                } else {
+                    currentTime++;
+                    continue;
+                }
+            }
+
+            // C. Record Execution Order
+            if (executionOrder.isEmpty() || 
+               !executionOrder.get(executionOrder.size() - 1).equals(currentProcess.name)) {
+                executionOrder.add(currentProcess.name);
+            }
+
+            // D. Execute for 1 unit
+            currentProcess.executeOneUnit(currentTime);
+            currentTime++;
+            timeInCurrentQuantum++;
+
+            // E. Check Completion
+            if (currentProcess.isFinished()) {
+                completed.add(currentProcess);
+                currentProcess.updateQuantum(0);
+                currentProcess = null;
+                timeInCurrentQuantum = 0;
                 continue;
             }
 
-            Process current = readyQueue.poll();
-            executionOrder.add(current.name);
+            // F. AG Logic
+            int Q = currentProcess.quantum;
+            
+            // Correct calculation of limits based on the AG rules
+            int limit1 = (int) Math.ceil(Q * 0.25);
+            int limit2 = limit1 + (int) Math.ceil(Q * 0.25); 
 
-            int q = current.quantum;
-            int q25 = (int) Math.ceil(q * 0.25);
-            int q50 = (int) Math.ceil(q * 0.50);
-
-            // -------- First 25% (FCFS) --------
-            int exec = Math.min(q25, current.remainingTime);
-            current.executeFor(exec, currentTime);
-            currentTime += exec;
-
-            if (current.isFinished()) {
-                completed++;
-                continue;
-            }
-
-            // -------- Second 25% (Priority) --------
             boolean preempted = false;
-            for (Process p : readyQueue) {
-                if (!p.isFinished() && p.priority < current.priority) {
-                    int remaining = q - exec;
-                    current.updateQuantum(q + (int) Math.ceil(remaining / 2.0));
-                    readyQueue.add(current);
+
+            // --- Scenario (ii): 25% Check (Priority) ---
+            if (timeInCurrentQuantum == limit1) {
+                Process best = null;
+                for (Process p : readyQueue) {
+                    if (p.priority < currentProcess.priority) {
+                        if (best == null || p.priority < best.priority) {
+                            best = p;
+                        }
+                    }
+                }
+
+                if (best != null) {
+                    int unused = Q - timeInCurrentQuantum;
+                    int newQ = Q + (int) Math.ceil(unused / 2.0); // Mean Rule
+                    currentProcess.updateQuantum(newQ);
+                    
+                    readyQueue.add(currentProcess);
+                    readyQueue.remove(best);
+                    currentProcess = best;
+                    timeInCurrentQuantum = 0;
                     preempted = true;
-                    break;
                 }
             }
-            if (preempted) continue;
 
-            exec = Math.min(q50 - q25, current.remainingTime);
-            current.executeFor(exec, currentTime);
-            currentTime += exec;
+            // --- Scenario (iii): 50% Check (SJF) ---
+            if (!preempted && timeInCurrentQuantum >= limit2) {
+                Process best = null;
+                for (Process p : readyQueue) {
+                    if (p.remainingTime < currentProcess.remainingTime) {
+                        if (best == null || p.remainingTime < best.remainingTime) {
+                            best = p;
+                        }
+                    }
+                }
 
-            if (current.isFinished()) {
-                completed++;
-                continue;
-            }
+                if (best != null) {
+                    int unused = Q - timeInCurrentQuantum;
+                    int newQ = Q + unused; // Sum Rule
+                    currentProcess.updateQuantum(newQ);
 
-            // -------- Remaining Quantum (Preemptive SJF) --------
-            for (Process p : readyQueue) {
-                if (!p.isFinished() && p.remainingTime < current.remainingTime) {
-                    current.updateQuantum(q + (q - q50));
-                    readyQueue.add(current);
+                    readyQueue.add(currentProcess);
+                    readyQueue.remove(best);
+                    currentProcess = best;
+                    timeInCurrentQuantum = 0;
                     preempted = true;
-                    break;
                 }
             }
-            if (preempted) continue;
 
-            exec = Math.min(q - q50, current.remainingTime);
-            current.executeFor(exec, currentTime);
-            currentTime += exec;
-
-            if (current.isFinished()) {
-                completed++;
-            } else {
-                current.updateQuantum(q + 2);
-                readyQueue.add(current);
+            // --- Scenario (i): Quantum Exhausted ---
+            if (!preempted && timeInCurrentQuantum == Q) {
+                int newQ = Q + 2;
+                currentProcess.updateQuantum(newQ);
+                
+                readyQueue.add(currentProcess);
+                currentProcess = null;
+                timeInCurrentQuantum = 0;
             }
         }
     }
 
-    List<String> getExecutionOrder() {
+    public List<String> getExecutionOrder() {
         return executionOrder;
     }
 }
