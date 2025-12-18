@@ -76,10 +76,81 @@ public class SchedulerTester {
         System.out.println("=".repeat(80));
     }
     
-    // TODO: Implement SJF (Shortest Job First) scheduler test
     private static boolean runSJFTest(JSONObject testCase) throws Exception {
-        System.out.println("⚠ SJF Scheduler not implemented yet - SKIPPING");
-        return false;
+        String testName = testCase.getString("name");
+        JSONObject input = testCase.getJSONObject("input");
+        int contextSwitch = input.getInt("contextSwitch");
+        JSONArray processesJson = input.getJSONArray("processes");
+
+        // Create processes
+        List<Process> processes = new ArrayList<>();
+        for (int i = 0; i < processesJson.length(); i++) {
+            JSONObject p = processesJson.getJSONObject(i);
+            processes.add(new Process(
+                p.getString("name"),
+                p.getInt("arrival"),
+                p.getInt("burst"),
+                p.getInt("priority")
+            ));
+        }
+
+        // Run SJF (preemptive SRTF) scheduler
+        SJFScheduler scheduler = new SJFScheduler(processes, contextSwitch);
+        scheduler.run();
+
+        // Get expected output
+        JSONObject expectedOutput = testCase.getJSONObject("expectedOutput");
+        JSONObject sjfExpected = expectedOutput.getJSONObject("SJF");
+
+        // Verify execution order
+        JSONArray expectedOrder = sjfExpected.getJSONArray("executionOrder");
+        List<String> actualOrder = scheduler.getExecutionOrder();
+
+        System.out.println("\n--- VERIFICATION ---");
+        System.out.println("Expected execution order: " + jsonArrayToList(expectedOrder));
+        System.out.println("Actual execution order:   " + actualOrder);
+
+        boolean executionOrderMatch = compareExecutionOrder(expectedOrder, actualOrder);
+        if (!executionOrderMatch) {
+            System.out.println("⚠ Execution order does not match!");
+        } else {
+            System.out.println("✓ Execution order matches!");
+        }
+
+        // Verify process results
+        JSONArray expectedResults = sjfExpected.getJSONArray("processResults");
+        boolean resultsMatch = verifyProcessResults(processes, expectedResults);
+
+        // Verify averages
+        double expectedAvgWT = sjfExpected.getDouble("averageWaitingTime");
+        double expectedAvgTAT = sjfExpected.getDouble("averageTurnaroundTime");
+
+        double actualAvgWT = processes.stream()
+            .mapToDouble(p -> p.waitingTime)
+            .average()
+            .orElse(0);
+        double actualAvgTAT = processes.stream()
+            .mapToDouble(p -> p.turnaroundTime)
+            .average()
+            .orElse(0);
+
+        System.out.println("\nExpected Avg WT: " + expectedAvgWT + " | Actual: " +
+            String.format("%.1f", actualAvgWT));
+        System.out.println("Expected Avg TAT: " + expectedAvgTAT + " | Actual: " +
+            String.format("%.1f", actualAvgTAT));
+
+        boolean avgMatch = Math.abs(expectedAvgWT - actualAvgWT) < 0.2 &&
+                          Math.abs(expectedAvgTAT - actualAvgTAT) < 0.2;
+
+        if (!avgMatch) {
+            System.out.println("⚠ Averages do not match!");
+        } else {
+            System.out.println("✓ Averages match!");
+        }
+
+        boolean passed = executionOrderMatch && resultsMatch && avgMatch;
+        System.out.println(passed ? "✓ SJF TEST PASSED" : "✗ SJF TEST FAILED");
+        return passed;
     }
     
     // Round Robin scheduler test (IMPLEMENTED)
