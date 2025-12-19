@@ -14,10 +14,10 @@ public class AGTester {
 
     public static void main(String[] args) {
         System.out.println("==========================================");
-        System.out.println("    AG SCHEDULER - GITHUB READY TESTER");
+        System.out.println("    AG SCHEDULER TESTER");
         System.out.println("==========================================\n");
 
-        // 1. Locate the 'tests' folder
+        // 1. Locate the 'test cases' folder
         File dir = new File(TEST_FOLDER);
 
         if (!dir.exists() || !dir.isDirectory()) {
@@ -35,7 +35,7 @@ public class AGTester {
             return;
         }
 
-        // 3. Sort files numerically (e.g., test2 comes before test10)
+        // 3. Sort files numerically
         Arrays.sort(testFiles, (f1, f2) -> {
             int n1 = extractNumber(f1.getName());
             int n2 = extractNumber(f2.getName());
@@ -89,7 +89,7 @@ public class AGTester {
 
             boolean filePassed = true;
 
-            // --- CHECK & PREVIEW ORDER ---
+            // --- CHECKORDER ---
             List<String> actOrder = scheduler.getExecutionOrder();
             
             System.out.println("   [Order Preview]: " + actOrder);
