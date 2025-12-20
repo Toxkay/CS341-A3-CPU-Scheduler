@@ -1,6 +1,8 @@
 package src.testers;
 
 import java.io.File;
+import src.models.Process;
+import src.schedulers.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
