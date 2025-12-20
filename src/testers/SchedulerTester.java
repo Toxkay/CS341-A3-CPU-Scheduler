@@ -83,7 +83,7 @@ public class SchedulerTester {
 
                 // Header for this file
                 System.out.println("\n" + "=".repeat(60));
-                System.out.println("📂 FILE: " + file.getName());
+                System.out.println("FILE: " + file.getName());
                 System.out.println("=".repeat(60));
 
                 // Display Input Table once per file
