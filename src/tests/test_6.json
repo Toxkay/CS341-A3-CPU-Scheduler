@@ -45,7 +45,7 @@
         "processResults": [
           {"name": "P1", "waitingTime": 16, "turnaroundTime": 30},
           {"name": "P2", "waitingTime": 7, "turnaroundTime": 14},
-          {"name": "P3", "waitingTime": 26, "turnaroundTime": 36},
+          {"name": "P3", "waitingTime": 25, "turnaroundTime": 35},
           {"name": "P4", "waitingTime": 29, "turnaroundTime": 34},
           {"name": "P5", "waitingTime": 32, "turnaroundTime": 40},
           {"name": "P6", "waitingTime": 38, "turnaroundTime": 42}
