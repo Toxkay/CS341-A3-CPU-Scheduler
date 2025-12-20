@@ -2,9 +2,8 @@ package src.schedulers;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.PriorityQueue;
 
 import src.models.Process;
 
@@ -12,132 +11,159 @@ public class PriorityScheduler {
 
     private final List<Process> processes;
     private final List<String> executionOrder = new ArrayList<>();
-    private final List<Process> readyQueue = new ArrayList<>();
 
     private final int contextSwitch;
     private final int agingInterval;
 
-    private Process running = null;
-    private int currentTime = 0;
-    
-    private final Map<String, Integer> waitingSince = new HashMap<>();
-    private final Map<String, Integer> originalPriority = new HashMap<>();
-    private final Map<String, Boolean> justArrived = new HashMap<>();
+    // ProcessState to track current priority and age timer separately
+    private static class ProcessState {
+        Process p;
+        int currentPriority;
+        int ageTimer = 0;
+
+        ProcessState(Process p) {
+            this.p = p;
+            this.currentPriority = p.priority;
+        }
+    }
 
     public PriorityScheduler(List<Process> processes, int contextSwitch, int agingInterval) {
         this.processes = processes;
         this.contextSwitch = contextSwitch;
-        this.  agingInterval = agingInterval;
+        this.agingInterval = agingInterval;
     }
 
     public void run() {
+        int numProcesses = processes.size();
+
+        // Create arrival pool sorted by arrival time
+        List<ProcessState> arrivePool = new ArrayList<>();
+        for (Process p : processes) {
+            arrivePool.add(new ProcessState(p));
+        }
+        arrivePool.sort(Comparator.comparingInt(a -> a.p.arrivalTime));
+
+        // Priority queue for ready processes
+        PriorityQueue<ProcessState> readyQueue = new PriorityQueue<>((a, b) -> {
+            if (a.currentPriority != b.currentPriority)
+                return Integer.compare(a.currentPriority, b.currentPriority);
+            if (a.p.arrivalTime != b.p.arrivalTime)
+                return Integer.compare(a.p.arrivalTime, b.p.arrivalTime);
+            return Integer.compare(a.p.priority, b.p.priority);  // Original priority as final tie-breaker
+        });
+
+        int time = 0;
         int completed = 0;
+        ProcessState current = null;
 
-        while (completed < processes.size()) {
-            addNewArrivals();
-            applyAging();
-            sortReadyQueueByPriority();
-
-            if (running != null && !  readyQueue.isEmpty()) {
-                Process highest = readyQueue.get(0);
-                boolean shouldPreempt = (highest.priority < running.priority) ||
-                                       (highest.priority == running.priority && highest.arrivalTime < running.arrivalTime) ||
-                                       (highest.  priority == running.priority && highest.  arrivalTime == running.arrivalTime && highest.name.compareTo(running.name) < 0);
-                
-                if (shouldPreempt) {
-                    readyQueue.add(running);
-                    waitingSince.put(running.name, currentTime);
-                    justArrived.put(running. name, false);
-                    originalPriority.put(running.  name, running.priority);
-                    running = null;
-                    currentTime += contextSwitch;
-                    continue;
-                }
+        while (completed < numProcesses) {
+            // Move arrived processes to ready queue
+            while (!arrivePool.isEmpty() && arrivePool.get(0).p.arrivalTime <= time) {
+                readyQueue.add(arrivePool.remove(0));
             }
 
-            if (running == null && !readyQueue.isEmpty()) {
-                running = readyQueue.  remove(0);
-                waitingSince.remove(running.name);
-                originalPriority.remove(running.  name);
-                justArrived.remove(running. name);
-                
-                if (executionOrder.isEmpty() || 
-                    !  executionOrder.get(executionOrder.size() - 1).equals(running.name)) {
-                    executionOrder.add(running.name);
-                }
-            }
+            if (current != null) {
+                ProcessState top = readyQueue.peek();
+                boolean finished = current.p.remainingTime <= 0;
+                boolean preempted = false;
 
-            if (running != null) {
-                running.executeOneUnit(currentTime);
-                currentTime++;
-                
-                if (running.isFinished()) {
-                    completed++;
-                    running = null;
-                    
-                    if (!  readyQueue.isEmpty()) {
-                        currentTime += contextSwitch;
+                // Check for preemption
+                if (top != null && !finished) {
+                    if (current.currentPriority > top.currentPriority) {
+                        preempted = true;
+                    } else if (top.currentPriority == current.currentPriority) {
+                        if (top.p.arrivalTime < current.p.arrivalTime) {
+                            preempted = true;
+                        } else if (top.p.arrivalTime == current.p.arrivalTime &&
+                                top.p.priority < current.p.priority) {
+                            preempted = true;
+                        }
                     }
                 }
-            } else {
-                currentTime++;
-            }
-        }
-    }
 
-    private void addNewArrivals() {
-        for (Process p : processes) {
-            if (p.arrivalTime <= currentTime && 
-                !  readyQueue.contains(p) && 
-                ! p.isFinished() && 
-                p != running) {
-                readyQueue.add(p);
-                if (!  waitingSince.containsKey(p.name)) {
-                    waitingSince.put(p.  name, currentTime);
-                    originalPriority.put(p.name, p.priority);
-                    justArrived.put(p.name, true);  // Mark as just arrived
+                if (finished || preempted) {
+                    if (finished) {
+                        current.p.completionTime = time;
+                        current.p.turnaroundTime = time - current.p.arrivalTime;
+                        current.p.waitingTime = current.p.turnaroundTime - current.p.burstTime;
+                        current.p.isCompleted = true;
+                        completed++;
+                    } else {
+                        readyQueue.add(current);
+                    }
+
+                    if (completed == numProcesses) break;
+
+                    ProcessState pending = readyQueue.poll();
+                    pending.ageTimer = 0;
+
+                    // Context switch with aging
+                    for (int i = 0; i < contextSwitch; i++) {
+                        time++;
+                        applyAging(readyQueue);
+                        while (!arrivePool.isEmpty() && arrivePool.get(0).p.arrivalTime <= time) {
+                            readyQueue.add(arrivePool.remove(0));
+                        }
+                    }
+
+                    // Check if better process arrived during context switch
+                    ProcessState bestNow = readyQueue.peek();
+                    if (bestNow != null) {
+                        boolean betterPrio = bestNow.currentPriority < pending.currentPriority;
+                        boolean betterArrival = (bestNow.currentPriority == pending.currentPriority &&
+                                bestNow.p.arrivalTime < pending.p.arrivalTime);
+                        boolean betterOrig = (bestNow.currentPriority == pending.currentPriority &&
+                                bestNow.p.arrivalTime == pending.p.arrivalTime &&
+                                bestNow.p.priority < pending.p.priority);
+
+                        if (betterPrio || betterArrival || betterOrig) {
+                            executionOrder.add(pending.p.name);
+                            readyQueue.add(pending);
+                            pending = readyQueue.poll();
+                            pending.ageTimer = 0;
+
+                            // Another context switch
+                            for (int i = 0; i < contextSwitch; i++) {
+                                time++;
+                                applyAging(readyQueue);
+                            }
+                        }
+                    }
+
+                    current = pending;
+                    executionOrder.add(current.p.name);
                 }
-            }
-        }
-    }
-
-    private void applyAging() {
-        if (agingInterval <= 0) return;
-        
-        for (Process p :   readyQueue) {
-            // Skip aging for processes that just arrived
-            if (justArrived.getOrDefault(p.name, false)) {
+            } else if (!readyQueue.isEmpty()) {
+                current = readyQueue.poll();
+                current.ageTimer = 0;
+                executionOrder.add(current.p.name);
+            } else {
+                time++;
                 continue;
             }
-            
-            Integer waitStart = waitingSince.get(p.name);
-            Integer origPri = originalPriority.  get(p.name);
-            
-            if (waitStart != null && origPri != null) {
-                int waitTime = currentTime - waitStart;
-                int ageCount = waitTime / agingInterval;
-                int newPri = Math.max(1, origPri - ageCount);
-                p.priority = newPri;
+
+            if (current != null) {
+                current.p.remainingTime--;
+                time++;
+                applyAging(readyQueue);
             }
         }
-        
-        // Mark arrived processes as no longer just arrived
-        justArrived.replaceAll((k, v) -> false);
     }
 
-    private void sortReadyQueueByPriority() {
-        readyQueue.sort(new Comparator<Process>() {
-            @Override
-            public int compare(Process p1, Process p2) {
-                if (p1.priority != p2.priority) {
-                    return Integer.compare(p1.priority, p2.priority);
-                } else if (p1.arrivalTime != p2.arrivalTime) {
-                    return Integer.compare(p1.arrivalTime, p2.arrivalTime);
-                } else {
-                    return p1.name.compareTo(p2.name);
-                }
+    private void applyAging(PriorityQueue<ProcessState> queue) {
+        if (agingInterval <= 0 || queue.isEmpty()) return;
+        
+        List<ProcessState> temp = new ArrayList<>();
+        while (!queue.isEmpty()) {
+            ProcessState ps = queue.poll();
+            ps.ageTimer++;
+            if (ps.ageTimer >= agingInterval) {
+                ps.currentPriority = Math.max(1, ps.currentPriority - 1);
+                ps.ageTimer = 0;
             }
-        });
+            temp.add(ps);
+        }
+        queue.addAll(temp);
     }
 
     public List<String> getExecutionOrder() {
@@ -145,15 +171,15 @@ public class PriorityScheduler {
     }
 
     public void printResults() {
-        System.out. println("\n========== Priority Scheduling ==========");
+        System.out.println("\n========== Priority Scheduling ==========");
         System.out.println("Execution Order: " + executionOrder);
 
         double totalWT = 0, totalTAT = 0;
 
         for (Process p : processes) {
-            System.out.println(p. name +
-                    " WT=" + p. waitingTime +
-                    " TAT=" + p.  turnaroundTime);
+            System.out.println(p.name +
+                    " WT=" + p.waitingTime +
+                    " TAT=" + p.turnaroundTime);
             totalWT += p.waitingTime;
             totalTAT += p.turnaroundTime;
         }
