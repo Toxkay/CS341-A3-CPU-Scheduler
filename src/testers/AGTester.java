@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
 
 public class AGTester {
 
-    private static final String TEST_FOLDER = "tests";
+    private static final String TEST_FOLDER = "src/tests";
 
     public static void main(String[] args) {
         System.out.println("=======================================================");
