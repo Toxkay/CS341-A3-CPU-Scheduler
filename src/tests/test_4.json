@@ -28,30 +28,30 @@
         "averageTurnaroundTime": 26.0
       },
       "RR": {
-        "executionOrder": ["P1","P2","P1","P3","P4","P2","P5","P1","P6","P3","P4","P5","P3","P5"],
+        "executionOrder": ["P1", "P2", "P1", "P3", "P4", "P2", "P5", "P1", "P6", "P3", "P4", "P5", "P3", "P5"],
         "processResults": [
-          {"name": "P1","waitingTime": 38,"turnaroundTime": 50},
-          {"name": "P2","waitingTime": 26,"turnaroundTime": 35},
-          {"name": "P3","waitingTime": 58,"turnaroundTime": 73},
-          {"name": "P4","waitingTime": 49,"turnaroundTime": 55},
-          {"name": "P5","waitingTime": 57,"turnaroundTime": 68},
-          {"name": "P6","waitingTime": 32,"turnaroundTime": 37}
+          {"name": "P1", "waitingTime": 38, "turnaroundTime": 50},
+          {"name": "P2", "waitingTime": 26, "turnaroundTime": 35},
+          {"name": "P3", "waitingTime": 58, "turnaroundTime": 73},
+          {"name": "P4", "waitingTime": 49, "turnaroundTime": 55},
+          {"name": "P5", "waitingTime": 57, "turnaroundTime": 68},
+          {"name": "P6", "waitingTime": 32, "turnaroundTime": 37}
         ],
         "averageWaitingTime": 43.33,
         "averageTurnaroundTime": 53.0
       },
       "Priority": {
-        "executionOrder": ["P1","P3","P1","P2","P3","P1","P3","P5","P1","P3","P2","P4","P3","P1","P5","P3","P6","P2","P3","P5","P4","P3","P2","P3","P5","P3","P6","P2","P4","P5","P2","P5","P2","P4","P5","P6","P2","P5","P4","P2","P6","P4","P6"],
+        "executionOrder": ["P1", "P3", "P1", "P2", "P3", "P4", "P5", "P6"],
         "processResults": [
-          {"name": "P1","waitingTime": 38,"turnaroundTime": 50},
-          {"name": "P2","waitingTime": 120,"turnaroundTime": 129},
-          {"name": "P3","waitingTime": 65,"turnaroundTime": 80},
-          {"name": "P4","waitingTime": 121,"turnaroundTime": 127},
-          {"name": "P5","waitingTime": 100,"turnaroundTime": 111},
-          {"name": "P6","waitingTime": 117,"turnaroundTime": 122}
+          {"name": "P1", "waitingTime": 8, "turnaroundTime": 20},
+          {"name": "P2", "waitingTime": 18, "turnaroundTime": 27},
+          {"name": "P3", "waitingTime": 21, "turnaroundTime": 36},
+          {"name": "P4", "waitingTime": 34, "turnaroundTime": 40},
+          {"name": "P5", "waitingTime": 38, "turnaroundTime": 49},
+          {"name": "P6", "waitingTime": 47, "turnaroundTime": 52}
         ],
-        "averageWaitingTime": 93.5,
-        "averageTurnaroundTime": 103.17
+        "averageWaitingTime": 27.67,
+        "averageTurnaroundTime": 37.33
       }
     }
   }

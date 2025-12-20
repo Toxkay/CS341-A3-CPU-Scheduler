@@ -1,3 +1,7 @@
+package src.testers;
+
+import src.models.Process;
+import src.schedulers.*;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
@@ -8,10 +12,10 @@ public class SchedulerTester {
     public static void main(String[] args) {
         System.out.println("========== CPU Scheduler Test Runner ==========\n");
         
-        // Find all test files
+        // Find all test files in src/tests
         List<String> testFiles = new ArrayList<>();
         for (int i = 1; i <= 10; i++) {
-            String filename = "test_" + i + ".json";
+            String filename = "src/tests/test_" + i + ".json";
             if (new File(filename).exists()) {
                 testFiles.add(filename);
             }

@@ -1,5 +1,7 @@
-package AGSchedulerTest;
+package src.testers;
 
+import src.models.Process;
+import src.schedulers.AGScheduler;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -10,7 +12,7 @@ import java.util.regex.Pattern;
 public class AGTester {
 
     // Define the folder name where JSON files are stored
-    private static final String TEST_FOLDER = "AG_testcases";
+    private static final String TEST_FOLDER = "src/tests";
 
     public static void main(String[] args) {
         System.out.println("==========================================");
