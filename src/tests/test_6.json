@@ -19,7 +19,7 @@
         "processResults": [
           {"name": "P1", "waitingTime": 40, "turnaroundTime": 54},
           {"name": "P2", "waitingTime": 1, "turnaroundTime": 8},
-          {"name": "P3", "waitingTime": 25, "turnaroundTime": 35},
+          {"name": "P3", "waitingTime": 26, "turnaroundTime": 36},
           {"name": "P4", "waitingTime": 3, "turnaroundTime": 8},
           {"name": "P5", "waitingTime": 11, "turnaroundTime": 19},
           {"name": "P6", "waitingTime": 3, "turnaroundTime": 7}
@@ -45,7 +45,7 @@
         "processResults": [
           {"name": "P1", "waitingTime": 16, "turnaroundTime": 30},
           {"name": "P2", "waitingTime": 7, "turnaroundTime": 14},
-          {"name": "P3", "waitingTime": 26, "turnaroundTime": 36},
+          {"name": "P3", "waitingTime": 25, "turnaroundTime": 35},
           {"name": "P4", "waitingTime": 29, "turnaroundTime": 34},
           {"name": "P5", "waitingTime": 32, "turnaroundTime": 40},
           {"name": "P6", "waitingTime": 38, "turnaroundTime": 42}
