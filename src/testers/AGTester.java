@@ -1,13 +1,14 @@
 package src.testers;
 
-import src.models.Process;
-import src.schedulers.AGScheduler;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import src.models.Process;
+import src.schedulers.AGScheduler;
 
 public class AGTester {
 

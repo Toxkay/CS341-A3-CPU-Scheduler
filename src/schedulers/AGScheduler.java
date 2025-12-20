@@ -1,12 +1,18 @@
 package src.schedulers;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+
 import src.models.Process;
-import java.util.*;
 
 public class AGScheduler { 
 
-    private List<Process> processes;
-    private List<String> executionOrder;
+    private final List<Process> processes;
+    private final List<String> executionOrder;
 
     public AGScheduler(List<Process> processes) {
         this.processes = processes;

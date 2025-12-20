@@ -1,7 +1,12 @@
 package src.schedulers;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+
 import src.models.Process;
-import java.util.*;
 
 public class RoundRobinScheduler {
 

@@ -239,16 +239,225 @@ public class SchedulerTester {
         return passed;
     }
     
-    // TODO: Implement Priority scheduler test
+    // Priority scheduler test (IMPLEMENTED)
     private static boolean runPriorityTest(JSONObject testCase) throws Exception {
-        System.out.println("⚠ Priority Scheduler not implemented yet - SKIPPING");
-        return false;
+        JSONObject input = testCase.getJSONObject("input");
+        int contextSwitch = input.getInt("contextSwitch");
+        int agingInterval = input.getInt("agingInterval");
+        JSONArray processesJson = input.getJSONArray("processes");
+
+        // Create processes
+        List<Process> processes = new ArrayList<>();
+        for (int i = 0; i < processesJson.length(); i++) {
+            JSONObject p = processesJson.getJSONObject(i);
+            processes.add(new Process(
+                p.getString("name"),
+                p.getInt("arrival"),
+                p.getInt("burst"),
+                p.getInt("priority")
+            ));
+        }
+
+        // Run Priority scheduler
+        PriorityScheduler scheduler = new PriorityScheduler(processes, contextSwitch, agingInterval);
+        scheduler.run();
+        scheduler.printResults();
+
+        // Get expected output
+        JSONObject expectedOutput = testCase.getJSONObject("expectedOutput");
+        JSONObject priorityExpected = expectedOutput.getJSONObject("Priority");
+
+        // Verify execution order
+        JSONArray expectedOrder = priorityExpected.getJSONArray("executionOrder");
+        List<String> actualOrder = scheduler.getExecutionOrder();
+
+        System.out.println("\n--- VERIFICATION ---");
+        System.out.println("Expected execution order: " + jsonArrayToList(expectedOrder));
+        System.out.println("Actual execution order:   " + actualOrder);
+
+        boolean executionOrderMatch = compareExecutionOrder(expectedOrder, actualOrder);
+        if (!executionOrderMatch) {
+            System.out.println("⚠ Execution order does not match!");
+        } else {
+            System.out.println("✓ Execution order matches!");
+        }
+
+        // Verify process results
+        JSONArray expectedResults = priorityExpected.getJSONArray("processResults");
+        boolean resultsMatch = verifyProcessResults(processes, expectedResults);
+
+        // Verify averages
+        double expectedAvgWT = priorityExpected.getDouble("averageWaitingTime");
+        double expectedAvgTAT = priorityExpected.getDouble("averageTurnaroundTime");
+
+        double actualAvgWT = processes.stream()
+            .mapToDouble(p -> p.waitingTime)
+            .average()
+            .orElse(0);
+        double actualAvgTAT = processes.stream()
+            .mapToDouble(p -> p.turnaroundTime)
+            .average()
+            .orElse(0);
+
+        System.out.println("\nExpected Avg WT: " + expectedAvgWT + " | Actual: " + 
+            String.format("%.1f", actualAvgWT));
+        System.out.println("Expected Avg TAT: " + expectedAvgTAT + " | Actual: " + 
+            String.format("%.1f", actualAvgTAT));
+
+        boolean avgMatch = Math.abs(expectedAvgWT - actualAvgWT) < 0.2 &&
+                          Math.abs(expectedAvgTAT - actualAvgTAT) < 0.2;
+
+        if (!avgMatch) {
+            System.out.println("⚠ Averages do not match!");
+        } else {
+            System.out.println("✓ Averages match!");
+        }
+
+        boolean passed = executionOrderMatch && resultsMatch && avgMatch;
+        System.out.println(passed ? "✓ Priority TEST PASSED" : "✗ Priority TEST FAILED");
+        return passed;
     }
     
-    // TODO: Implement AG scheduler test
+    // AG scheduler test
     private static boolean runAGTest(JSONObject testCase) throws Exception {
-        System.out.println("⚠ AG Scheduler not implemented yet - SKIPPING");
-        return false;
+        JSONObject expectedOutput = testCase.getJSONObject("expectedOutput");
+        
+        // Check if AG data exists in the test case
+        if (!expectedOutput.has("AG")) {
+            System.out.println("⚠ No AG test data in this test file - SKIPPING");
+            return false;
+        }
+        
+        JSONObject input = testCase.getJSONObject("input");
+        JSONArray processesJson = input.getJSONArray("processes");
+
+        // Create processes with quantum values
+        List<Process> processes = new ArrayList<>();
+        for (int i = 0; i < processesJson.length(); i++) {
+            JSONObject p = processesJson.getJSONObject(i);
+            Process proc = new Process(
+                p.getString("name"),
+                p.getInt("arrival"),
+                p.getInt("burst"),
+                p.getInt("priority")
+            );
+            // Set initial quantum if provided
+            if (p.has("quantum")) {
+                proc.quantum = p.getInt("quantum");
+            }
+            processes.add(proc);
+        }
+
+        // Run AG scheduler
+        AGScheduler scheduler = new AGScheduler(processes);
+        scheduler.run();
+
+        // Get expected output
+        JSONObject agExpected = expectedOutput.getJSONObject("AG");
+
+        // Verify execution order
+        JSONArray expectedOrder = agExpected.getJSONArray("executionOrder");
+        List<String> actualOrder = scheduler.getExecutionOrder();
+
+        System.out.println("\n========== AG Scheduling ==========");
+        System.out.println("Execution Order: " + String.join(" -> ", actualOrder));
+        
+        System.out.println("\nProcess Details:");
+        System.out.println(String.format("%-10s %-12s %-12s %-15s %-15s %-10s %-20s", 
+            "Process", "Arrival", "Burst", "Completion", "Turnaround", "Waiting", "Quantum History"));
+        System.out.println("-".repeat(100));
+
+        for (Process p : processes) {
+            System.out.println(String.format("%-10s %-12d %-12d %-15d %-15d %-10d %-20s",
+                p.name, p.arrivalTime, p.burstTime, p.completionTime, 
+                p.turnaroundTime, p.waitingTime, p.quantumHistory.toString()));
+        }
+
+        double totalWT = processes.stream().mapToDouble(p -> p.waitingTime).sum();
+        double totalTAT = processes.stream().mapToDouble(p -> p.turnaroundTime).sum();
+        
+        System.out.println("\n----- Averages -----");
+        System.out.println(String.format("Average Waiting Time: %.2f", totalWT / processes.size()));
+        System.out.println(String.format("Average Turnaround Time: %.2f", totalTAT / processes.size()));
+        System.out.println("====================================\n");
+
+        System.out.println("\n--- VERIFICATION ---");
+        System.out.println("Expected execution order: " + jsonArrayToList(expectedOrder));
+        System.out.println("Actual execution order:   " + actualOrder);
+
+        boolean executionOrderMatch = compareExecutionOrder(expectedOrder, actualOrder);
+        if (!executionOrderMatch) {
+            System.out.println("⚠ Execution order does not match!");
+        } else {
+            System.out.println("✓ Execution order matches!");
+        }
+
+        // Verify process results
+        JSONArray expectedResults = agExpected.getJSONArray("processResults");
+        boolean resultsMatch = verifyProcessResults(processes, expectedResults);
+
+        // Verify quantum history if available
+        boolean quantumMatch = true;
+        for (int i = 0; i < expectedResults.length(); i++) {
+            JSONObject expected = expectedResults.getJSONObject(i);
+            if (expected.has("quantumHistory")) {
+                String name = expected.getString("name");
+                JSONArray expectedQuantumHistory = expected.getJSONArray("quantumHistory");
+                
+                Process actual = processes.stream()
+                    .filter(p -> p.name.equals(name))
+                    .findFirst()
+                    .orElse(null);
+                
+                if (actual != null) {
+                    List<Integer> expectedQH = new ArrayList<>();
+                    for (int j = 0; j < expectedQuantumHistory.length(); j++) {
+                        expectedQH.add(expectedQuantumHistory.getInt(j));
+                    }
+                    
+                    if (!expectedQH.equals(actual.quantumHistory)) {
+                        System.out.println("⚠ " + name + " Quantum History mismatch: Expected " + 
+                            expectedQH + ", Got " + actual.quantumHistory);
+                        quantumMatch = false;
+                    }
+                }
+            }
+        }
+
+        if (quantumMatch) {
+            System.out.println("✓ Quantum histories match!");
+        }
+
+        // Verify averages
+        double expectedAvgWT = agExpected.getDouble("averageWaitingTime");
+        double expectedAvgTAT = agExpected.getDouble("averageTurnaroundTime");
+
+        double actualAvgWT = processes.stream()
+            .mapToDouble(p -> p.waitingTime)
+            .average()
+            .orElse(0);
+        double actualAvgTAT = processes.stream()
+            .mapToDouble(p -> p.turnaroundTime)
+            .average()
+            .orElse(0);
+
+        System.out.println("\nExpected Avg WT: " + expectedAvgWT + " | Actual: " + 
+            String.format("%.1f", actualAvgWT));
+        System.out.println("Expected Avg TAT: " + expectedAvgTAT + " | Actual: " + 
+            String.format("%.1f", actualAvgTAT));
+
+        boolean avgMatch = Math.abs(expectedAvgWT - actualAvgWT) < 0.2 &&
+                          Math.abs(expectedAvgTAT - actualAvgTAT) < 0.2;
+
+        if (!avgMatch) {
+            System.out.println("⚠ Averages do not match!");
+        } else {
+            System.out.println("✓ Averages match!");
+        }
+
+        boolean passed = executionOrderMatch && resultsMatch && quantumMatch && avgMatch;
+        System.out.println(passed ? "✓ AG TEST PASSED" : "✗ AG TEST FAILED");
+        return passed;
     }
     
     // Helper methods for verification

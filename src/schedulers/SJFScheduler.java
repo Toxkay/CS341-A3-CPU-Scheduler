@@ -1,7 +1,12 @@
 package src.schedulers;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import src.models.Process;
-import java.util.*;
 
 public class SJFScheduler {
 
@@ -35,7 +40,7 @@ public class SJFScheduler {
         int completed = 0;
         int nextArrivalIndex = 0;
         Process current = null;
-        Process lastCompleted = null;
+        String lastExecutedName = null;
 
         while (completed < copies.size()) {
 
@@ -58,8 +63,8 @@ public class SJFScheduler {
                     continue;
                 }
 
-                // Context switch time only after a completion (not after preemption)
-                if (lastCompleted != null && contextSwitch > 0) {
+                if (lastExecutedName != null && contextSwitch > 0) {
+                    // Context switch time happens before selecting next after a completion
                     for (int i = 0; i < contextSwitch; i++) {
                         currentTime++;
                         while (nextArrivalIndex < copies.size() && copies.get(nextArrivalIndex).arrivalTime <= currentTime) {
@@ -67,7 +72,6 @@ public class SJFScheduler {
                             nextArrivalIndex++;
                         }
                     }
-                    lastCompleted = null; // Reset after applying context switch
                 }
 
                 current = selectShortestRemaining(ready);
@@ -79,6 +83,7 @@ public class SJFScheduler {
                 if (executionOrder.isEmpty() || !executionOrder.get(executionOrder.size() - 1).equals(current.name)) {
                     executionOrder.add(current.name);
                 }
+                lastExecutedName = current.name;
             }
 
             // Execute one time unit
@@ -94,7 +99,7 @@ public class SJFScheduler {
             // Completion
             if (current.isFinished()) {
                 completed++;
-                lastCompleted = current;
+                lastExecutedName = current.name;
                 current = null;
                 continue;
             }
@@ -106,7 +111,7 @@ public class SJFScheduler {
                 ready.remove(best);
                 ready.add(current);
 
-                // Context switch time on preemption
+                // Context switch time on preemption (arrivals during CS are added, but we do not reconsider selection)
                 if (contextSwitch > 0) {
                     for (int i = 0; i < contextSwitch; i++) {
                         currentTime++;
@@ -121,6 +126,7 @@ public class SJFScheduler {
                 if (executionOrder.isEmpty() || !executionOrder.get(executionOrder.size() - 1).equals(current.name)) {
                     executionOrder.add(current.name);
                 }
+                lastExecutedName = current.name;
             }
         }
 
