@@ -11,8 +11,8 @@ import src.models.Process;
 
 public class AGScheduler { 
 
-    private final List<Process> processes;
-    private final List<String> executionOrder;
+    private List<Process> processes;
+    private List<String> executionOrder;
 
     public AGScheduler(List<Process> processes) {
         this.processes = processes;
@@ -20,57 +20,79 @@ public class AGScheduler {
     }
 
     public void run() {
-        // Sort by Arrival Time first
+        // Sort by Arrival Time
         processes.sort(Comparator.comparingInt(p -> p.arrivalTime));
 
         Queue<Process> readyQueue = new LinkedList<>();
         List<Process> completed = new ArrayList<>();
-        
-        // Helper to manage arrivals
         List<Process> pendingArrivals = new ArrayList<>(processes);
         
         int currentTime = 0;
         int timeInCurrentQuantum = 0;
         Process currentProcess = null;
 
+        // 1. Initial Load (t=0)
+        Iterator<Process> it = pendingArrivals.iterator();
+        while (it.hasNext()) {
+            Process p = it.next();
+            if (p.arrivalTime <= currentTime) {
+                readyQueue.add(p);
+                it.remove();
+            } else {
+                break;
+            }
+        }
+
         while (completed.size() < processes.size()) {
 
-            // A. Handle Arrivals
-            // Add any process that has arrived by 'currentTime' to the ready queue
-            Iterator<Process> it = pendingArrivals.iterator();
-            while (it.hasNext()) {
-                Process p = it.next();
-                if (p.arrivalTime <= currentTime) {
-                    readyQueue.add(p);
-                    it.remove();
-                } else {
-                    break; 
-                }
-            }
-
-            // B. CPU Load
+            // 2. Load CPU
             if (currentProcess == null) {
                 if (!readyQueue.isEmpty()) {
                     currentProcess = readyQueue.poll();
                     timeInCurrentQuantum = 0;
                 } else {
                     currentTime++;
+                    // Check arrivals during idle time
+                    it = pendingArrivals.iterator();
+                    while (it.hasNext()) {
+                        Process p = it.next();
+                        if (p.arrivalTime <= currentTime) {
+                            readyQueue.add(p);
+                            it.remove();
+                        } else {
+                            break;
+                        }
+                    }
                     continue;
                 }
             }
 
-            // C. Record Execution Order
+            // 3. Record Order
             if (executionOrder.isEmpty() || 
                !executionOrder.get(executionOrder.size() - 1).equals(currentProcess.name)) {
                 executionOrder.add(currentProcess.name);
             }
 
-            // D. Execute for 1 unit
+            // 4. Execute One Unit
+            // Time moves from t to t+1
             currentProcess.executeOneUnit(currentTime);
             currentTime++;
             timeInCurrentQuantum++;
 
-            // E. Check Completion
+            // 5. CRITICAL: Handle Arrivals *Before* Re-queueing Current
+            // This ensures new arrivals get ahead of the current process if it gets preempted/exhausted
+            it = pendingArrivals.iterator();
+            while (it.hasNext()) {
+                Process p = it.next();
+                if (p.arrivalTime <= currentTime) {
+                    readyQueue.add(p);
+                    it.remove();
+                } else {
+                    break;
+                }
+            }
+
+            // 6. Check Completion
             if (currentProcess.isFinished()) {
                 completed.add(currentProcess);
                 currentProcess.updateQuantum(0);
@@ -79,18 +101,17 @@ public class AGScheduler {
                 continue;
             }
 
-            // F. AG Logic
+            // 7. AG Quantum Logic
             int Q = currentProcess.quantum;
-            
-            // Correct calculation of limits based on the AG rules
             int limit1 = (int) Math.ceil(Q * 0.25);
-            int limit2 = limit1 + (int) Math.ceil(Q * 0.25); 
+            int limit2 = limit1 + (int) Math.ceil(Q * 0.25);
 
             boolean preempted = false;
 
             // --- Scenario (ii): 25% Check (Priority) ---
             if (timeInCurrentQuantum == limit1) {
                 Process best = null;
+                // Find strictly better priority
                 for (Process p : readyQueue) {
                     if (p.priority < currentProcess.priority) {
                         if (best == null || p.priority < best.priority) {
@@ -104,9 +125,9 @@ public class AGScheduler {
                     int newQ = Q + (int) Math.ceil(unused / 2.0); // Mean Rule
                     currentProcess.updateQuantum(newQ);
                     
-                    readyQueue.add(currentProcess);
-                    readyQueue.remove(best);
-                    currentProcess = best;
+                    readyQueue.add(currentProcess); // Add current to back
+                    readyQueue.remove(best);        // Remove best from middle
+                    currentProcess = best;          // Switch
                     timeInCurrentQuantum = 0;
                     preempted = true;
                 }
@@ -115,6 +136,7 @@ public class AGScheduler {
             // --- Scenario (iii): 50% Check (SJF) ---
             if (!preempted && timeInCurrentQuantum >= limit2) {
                 Process best = null;
+                // Find strictly shorter remaining time
                 for (Process p : readyQueue) {
                     if (p.remainingTime < currentProcess.remainingTime) {
                         if (best == null || p.remainingTime < best.remainingTime) {
@@ -138,7 +160,7 @@ public class AGScheduler {
 
             // --- Scenario (i): Quantum Exhausted ---
             if (!preempted && timeInCurrentQuantum == Q) {
-                int newQ = Q + 2;
+                int newQ = Q + 2; // Increase Rule
                 currentProcess.updateQuantum(newQ);
                 
                 readyQueue.add(currentProcess);
