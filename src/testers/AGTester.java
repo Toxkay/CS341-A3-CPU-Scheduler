@@ -7,38 +7,29 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import src.models.Process;
-import src.schedulers.AGScheduler;
-
 public class AGTester {
 
-    // Define the folder name where JSON files are stored
-    private static final String TEST_FOLDER = "src/tests";
+    private static final String TEST_FOLDER = "tests";
 
     public static void main(String[] args) {
-        System.out.println("==========================================");
-        System.out.println("    AG SCHEDULER TESTER");
-        System.out.println("==========================================\n");
+        System.out.println("=======================================================");
+        System.out.println("          AG SCHEDULER - TEST REPORT          ");
+        System.out.println("=======================================================\n");
 
-        // 1. Locate the 'test cases' folder
         File dir = new File(TEST_FOLDER);
-
         if (!dir.exists() || !dir.isDirectory()) {
             System.out.println("❌ Error: Folder '" + TEST_FOLDER + "' not found.");
-            System.out.println("   Please create a folder named '" + TEST_FOLDER + "' in your project root");
-            System.out.println("   and place your .json files inside it.");
             return;
         }
 
-        // 2. Find files inside the folder
         File[] testFiles = dir.listFiles((d, name) -> name.startsWith("AG_test") && name.endsWith(".json"));
 
         if (testFiles == null || testFiles.length == 0) {
-            System.out.println("❌ No test files found in '" + TEST_FOLDER + "/' matching 'AG_test*.json'.");
+            System.out.println("❌ No test files found in '" + TEST_FOLDER + "'.");
             return;
         }
 
-        // 3. Sort files numerically
+        // Sort files numerically
         Arrays.sort(testFiles, (f1, f2) -> {
             int n1 = extractNumber(f1.getName());
             int n2 = extractNumber(f2.getName());
@@ -48,43 +39,48 @@ public class AGTester {
         int totalFiles = testFiles.length;
         int filesPassed = 0;
 
-        System.out.println("Loaded " + totalFiles + " test cases from '" + TEST_FOLDER + "/' directory.\n");
-
-        // 4. Run Loop
         for (File file : testFiles) {
-            System.out.println(">>> TESTING: " + file.getName());
-            boolean passed = runTest(file);
-            
-            if (passed) {
-                System.out.println("RESULT: [ PASSED ] ✅");
-                filesPassed++;
-            } else {
-                System.out.println("RESULT: [ FAILED ] ❌");
-            }
-            System.out.println("------------------------------------------\n");
+            boolean passed = runDetailedTest(file);
+            if (passed) filesPassed++;
+            System.out.println("\n\n"); // Spacing between files
         }
 
-        System.out.println("==========================================");
-        System.out.printf("SUMMARY: %d/%d Files Passed.\n", filesPassed, totalFiles);
-        System.out.println("==========================================");
+        System.out.println("#######################################################");
+        System.out.printf("FINAL SUMMARY: %d / %d Files Passed.\n", filesPassed, totalFiles);
+        System.out.println("#######################################################");
     }
 
-    private static boolean runTest(File file) {
+    private static boolean runDetailedTest(File file) {
+        System.out.println("_______________________________________________________");
+        System.out.println(">>> FILE: " + file.getName());
+        System.out.println("‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾");
+
         try {
             String jsonContent = new String(Files.readAllBytes(file.toPath()));
             
-            // 1. Parse Input
+            // 1. Parse & Display Inputs
             List<Process> processes = parseInputProcesses(jsonContent);
             if (processes.isEmpty()) {
-                System.out.println("   Error: No processes found in JSON.");
+                System.out.println("Error: No processes found in JSON.");
                 return false;
             }
+
+            System.out.println("[ 1. INPUTS ]");
+            System.out.printf("  %-5s | %-7s | %-7s | %-8s | %-7s%n", "Name", "Arrival", "Burst", "Priority", "Quantum");
+            System.out.println("  ---------------------------------------------------");
+            for (Process p : processes) {
+
+                int initQ = p.quantum; 
+                System.out.printf("  %-5s | %-7d | %-7d | %-8d | %-7d%n", 
+                    p.name, p.arrivalTime, p.burstTime, p.priority, initQ);
+            }
+            System.out.println();
 
             // 2. Run Scheduler
             AGScheduler scheduler = new AGScheduler(processes);
             scheduler.run();
 
-            // 3. Parse Expected Output
+            // 3. Parse Expected
             List<String> expOrder = parseExpectedOrder(jsonContent);
             Map<String, ExpectedStats> expStats = parseExpectedStats(jsonContent);
             double expWt = parseDouble(jsonContent, "\"averageWaitingTime\"");
@@ -92,19 +88,21 @@ public class AGTester {
 
             boolean filePassed = true;
 
-            // --- CHECKORDER ---
+            // 4. Compare Order
+            System.out.println("[ 2. EXECUTION ORDER ]");
             List<String> actOrder = scheduler.getExecutionOrder();
-            
-            System.out.println("   [Order Preview]: " + actOrder);
+            boolean orderMatch = actOrder.equals(expOrder);
+            if (!orderMatch) filePassed = false;
 
-            if (!actOrder.equals(expOrder)) {
-                filePassed = false;
-                System.out.println("   ❌ Order Mismatch:");
-                System.out.println("      Expected: " + expOrder);
-            } 
+            System.out.println("  Expected: " + expOrder);
+            System.out.println("  Actual:   " + actOrder);
+            System.out.println("  Status:   " + (orderMatch ? "✅ MATCH" : "❌ MISMATCH"));
+            System.out.println();
 
-            // --- CHECK PROCESS DETAILS ---
+            // 5. Process Metrics
+            System.out.println("[ 3. PROCESS DETAILS ]");
             processes.sort(Comparator.comparing(p -> p.name));
+            
             for (Process p : processes) {
                 ExpectedStats exp = expStats.get(p.name);
                 if (exp == null) continue;
@@ -112,37 +110,53 @@ public class AGTester {
                 boolean wtMatch = p.waitingTime == exp.waitingTime;
                 boolean tatMatch = p.turnaroundTime == exp.turnaroundTime;
                 boolean histMatch = p.quantumHistory.equals(exp.history);
+                boolean processPassed = wtMatch && tatMatch && histMatch;
 
-                if (!wtMatch || !tatMatch || !histMatch) {
-                    filePassed = false;
-                    System.out.println("   ❌ " + p.name + " Failed:");
-                    if (!wtMatch) System.out.printf("      WT: Exp %d | Act %d\n", exp.waitingTime, p.waitingTime);
-                    if (!tatMatch) System.out.printf("      TAT: Exp %d | Act %d\n", exp.turnaroundTime, p.turnaroundTime);
-                    if (!histMatch) System.out.printf("      Hist: Exp %s | Act %s\n", exp.history, p.quantumHistory);
-                }
+                if (!processPassed) filePassed = false;
+
+                String pStatus = processPassed ? "✅ OK" : "❌ FAIL";
+                System.out.printf("  > Process %s  [%s]%n", p.name, pStatus);
+                
+                // Waiting Time
+                System.out.printf("      Waiting Time    : Exp %-3d  | Act %-3d  %s%n", 
+                    exp.waitingTime, p.waitingTime, (wtMatch ? "" : "<-- DIFF"));
+                
+                // Turnaround Time
+                System.out.printf("      Turnaround Time : Exp %-3d  | Act %-3d  %s%n", 
+                    exp.turnaroundTime, p.turnaroundTime, (tatMatch ? "" : "<-- DIFF"));
+                
+                // History
+                System.out.printf("      Quantum History : Exp %-12s | Act %-12s %s%n", 
+                    exp.history.toString(), p.quantumHistory.toString(), (histMatch ? "" : "<-- DIFF"));
+                System.out.println();
             }
 
-            // --- CHECK AVERAGES ---
+            // 6. Averages
+            System.out.println("[ 4. AVERAGES ]");
             double actWt = processes.stream().mapToInt(p -> p.waitingTime).average().orElse(0);
             double actTat = processes.stream().mapToInt(p -> p.turnaroundTime).average().orElse(0);
 
-            if (Math.abs(actWt - expWt) >= 0.01) {
-                filePassed = false;
-                System.out.printf("   ❌ Avg WT: Exp %.2f | Act %.2f\n", expWt, actWt);
-            }
+            boolean avgWtMatch = Math.abs(actWt - expWt) < 0.01;
+            boolean avgTatMatch = Math.abs(actTat - expTat) < 0.01;
+            
+            if (!avgWtMatch || !avgTatMatch) filePassed = false;
 
-            if (Math.abs(actTat - expTat) >= 0.01) {
-                filePassed = false;
-                System.out.printf("   ❌ Avg TAT: Exp %.2f | Act %.2f\n", expTat, actTat);
-            }
+            System.out.printf("  Avg Waiting Time    : Exp %-5.1f | Act %-5.1f %s%n", 
+                expWt, actWt, (avgWtMatch ? "✅" : "❌"));
+            System.out.printf("  Avg Turnaround Time : Exp %-5.1f | Act %-5.1f %s%n", 
+                expTat, actTat, (avgTatMatch ? "✅" : "❌"));
 
+            // Final File Status
+            System.out.println("_______________________________________________________");
+            System.out.println("RESULT: " + (filePassed ? "PASSED ✅" : "FAILED ❌"));
+            
             return filePassed;
 
         } catch (IOException e) {
-            System.out.println("   File Read Error: " + e.getMessage());
+            System.out.println("File Read Error: " + e.getMessage());
             return false;
         } catch (Exception e) {
-            System.out.println("   Execution Error: " + e.getMessage());
+            System.out.println("Execution Error: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -155,9 +169,7 @@ public class AGTester {
     private static int extractNumber(String filename) {
         try {
             Matcher m = Pattern.compile("(\\d+)").matcher(filename);
-            if (m.find()) {
-                return Integer.parseInt(m.group(1));
-            }
+            if (m.find()) return Integer.parseInt(m.group(1));
         } catch (Exception ignored) {}
         return 9999;
     }
