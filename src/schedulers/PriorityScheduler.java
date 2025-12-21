@@ -168,6 +168,7 @@ public class PriorityScheduler {
                 continue;
             }
 
+            // Execute one time unit
             if (current != null) {
                 current.p.remainingTime--;
                 time++;
