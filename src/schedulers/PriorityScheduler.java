@@ -11,11 +11,9 @@ public class PriorityScheduler {
 
     private final List<Process> processes;
     private final List<String> executionOrder = new ArrayList<>();
-
     private final int contextSwitch;
     private final int agingInterval;
 
-    // ProcessState to track current priority and age timer separately
     private static class ProcessState {
         Process p;
         int currentPriority;
@@ -36,20 +34,18 @@ public class PriorityScheduler {
     public void run() {
         int numProcesses = processes.size();
 
-        // Create arrival pool sorted by arrival time
         List<ProcessState> arrivePool = new ArrayList<>();
         for (Process p : processes) {
             arrivePool.add(new ProcessState(p));
         }
         arrivePool.sort(Comparator.comparingInt(a -> a.p.arrivalTime));
 
-        // Priority queue for ready processes
         PriorityQueue<ProcessState> readyQueue = new PriorityQueue<>((a, b) -> {
             if (a.currentPriority != b.currentPriority)
                 return Integer.compare(a.currentPriority, b.currentPriority);
             if (a.p.arrivalTime != b.p.arrivalTime)
                 return Integer.compare(a.p.arrivalTime, b.p.arrivalTime);
-            return Integer.compare(a.p.priority, b.p.priority);  // Original priority as final tie-breaker
+            return Integer.compare(a.p.priority, b.p.priority);
         });
 
         int time = 0;
@@ -57,7 +53,7 @@ public class PriorityScheduler {
         ProcessState current = null;
 
         while (completed < numProcesses) {
-            // Move arrived processes to ready queue
+            // Add newly arrived processes
             while (!arrivePool.isEmpty() && arrivePool.get(0).p.arrivalTime <= time) {
                 readyQueue.add(arrivePool.remove(0));
             }
@@ -67,7 +63,6 @@ public class PriorityScheduler {
                 boolean finished = current.p.remainingTime <= 0;
                 boolean preempted = false;
 
-                // Check for preemption
                 if (top != null && !finished) {
                     if (current.currentPriority > top.currentPriority) {
                         preempted = true;
@@ -92,46 +87,48 @@ public class PriorityScheduler {
                         readyQueue.add(current);
                     }
 
-                    if (completed == numProcesses) break;
+                    if (completed == numProcesses)
+                        break;
 
                     ProcessState pending = readyQueue.poll();
-                    pending.ageTimer = 0;
+                    if (pending != null) {
+                        pending.ageTimer = 0;
 
-                    // Context switch with aging
-                    for (int i = 0; i < contextSwitch; i++) {
-                        time++;
-                        applyAging(readyQueue);
-                        while (!arrivePool.isEmpty() && arrivePool.get(0).p.arrivalTime <= time) {
-                            readyQueue.add(arrivePool.remove(0));
-                        }
-                    }
-
-                    // Check if better process arrived during context switch
-                    ProcessState bestNow = readyQueue.peek();
-                    if (bestNow != null) {
-                        boolean betterPrio = bestNow.currentPriority < pending.currentPriority;
-                        boolean betterArrival = (bestNow.currentPriority == pending.currentPriority &&
-                                bestNow.p.arrivalTime < pending.p.arrivalTime);
-                        boolean betterOrig = (bestNow.currentPriority == pending.currentPriority &&
-                                bestNow.p.arrivalTime == pending.p.arrivalTime &&
-                                bestNow.p.priority < pending.p.priority);
-
-                        if (betterPrio || betterArrival || betterOrig) {
-                            executionOrder.add(pending.p.name);
-                            readyQueue.add(pending);
-                            pending = readyQueue.poll();
-                            pending.ageTimer = 0;
-
-                            // Another context switch
-                            for (int i = 0; i < contextSwitch; i++) {
-                                time++;
-                                applyAging(readyQueue);
+                        // Context switch
+                        for (int i = 0; i < contextSwitch; i++) {
+                            time++;
+                            applyAging(readyQueue);
+                            while (!arrivePool.isEmpty() && arrivePool.get(0).p.arrivalTime <= time) {
+                                readyQueue.add(arrivePool.remove(0));
                             }
                         }
-                    }
 
-                    current = pending;
-                    executionOrder.add(current.p.name);
+                        // Check if better process arrived during context switch
+                        ProcessState bestNow = readyQueue.peek();
+                        if (bestNow != null) {
+                            boolean betterPrio = bestNow.currentPriority < pending.currentPriority;
+                            boolean betterArrival = (bestNow.currentPriority == pending.currentPriority &&
+                                    bestNow.p.arrivalTime < pending.p.arrivalTime);
+                            boolean betterOrig = (bestNow.currentPriority == pending.currentPriority &&
+                                    bestNow.p.arrivalTime == pending.p.arrivalTime &&
+                                    bestNow.p.priority < pending.p.priority);
+
+                            if (betterPrio || betterArrival || betterOrig) {
+                                executionOrder.add(pending.p.name);
+                                readyQueue.add(pending);
+                                pending = readyQueue.poll();
+                                pending.ageTimer = 0;
+
+                                for (int i = 0; i < contextSwitch; i++) {
+                                    time++;
+                                    applyAging(readyQueue);
+                                }
+                            }
+                        }
+
+                        current = pending;
+                        executionOrder.add(current.p.name);
+                    }
                 }
             } else if (!readyQueue.isEmpty()) {
                 current = readyQueue.poll();
@@ -142,6 +139,7 @@ public class PriorityScheduler {
                 continue;
             }
 
+            // Execute one time unit
             if (current != null) {
                 current.p.remainingTime--;
                 time++;
@@ -151,8 +149,9 @@ public class PriorityScheduler {
     }
 
     private void applyAging(PriorityQueue<ProcessState> queue) {
-        if (agingInterval <= 0 || queue.isEmpty()) return;
-        
+        if (agingInterval <= 0 || queue.isEmpty())
+            return;
+
         List<ProcessState> temp = new ArrayList<>();
         while (!queue.isEmpty()) {
             ProcessState ps = queue.poll();
