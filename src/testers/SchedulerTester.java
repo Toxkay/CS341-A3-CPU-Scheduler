@@ -15,44 +15,44 @@ public class SchedulerTester {
     private static final String TEST_FOLDER = "src/tests";
 
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-
-        List<File> testFiles = loadTestFiles();
-        if (testFiles.isEmpty()) {
-            printError("No JSON test files found in '" + TEST_FOLDER + "'.");
-            return;
-        }
-
-        while (true) {
-            printHeader("CPU SCHEDULER TESTER");
-            System.out.println("  Loaded " + testFiles.size() + " test files.");
-            System.out.println("----------------------------------------");
-            System.out.println("  [1] Test Shortest Job First (SJF)");
-            System.out.println("  [2] Test Round Robin (RR)");
-            System.out.println("  [3] Test Priority Scheduling");
-            System.out.println("  [4] Test AG Scheduling");
-            System.out.println("  [5] Run ALL Tests");
-            System.out.println("  [0] Exit");
-            System.out.println("----------------------------------------");
-            System.out.print("Enter your choice: ");
-
-            String input = scanner.nextLine();
-            
-            switch (input) {
-                case "1": runBatch(testFiles, "SJF"); break;
-                case "2": runBatch(testFiles, "RR"); break;
-                case "3": runBatch(testFiles, "Priority"); break;
-                case "4": runBatch(testFiles, "AG"); break;
-                case "5": runBatch(testFiles, "ALL"); break;
-                case "0": 
-                    System.out.println("Goodbye!");
-                    return;
-                default:
-                    System.out.println("Invalid choice, please try again.");
+        try (Scanner scanner = new Scanner(System.in)) {
+            List<File> testFiles = loadTestFiles();
+            if (testFiles.isEmpty()) {
+                printError("No JSON test files found in '" + TEST_FOLDER + "'.");
+                return;
             }
-            
-            System.out.println("\nPress [ENTER] to return to menu...");
-            scanner.nextLine();
+
+            while (true) {
+                printHeader("CPU SCHEDULER TESTER");
+                System.out.println("  Loaded " + testFiles.size() + " test files.");
+                System.out.println("----------------------------------------");
+                System.out.println("  [1] Test Shortest Job First (SJF)");
+                System.out.println("  [2] Test Round Robin (RR)");
+                System.out.println("  [3] Test Priority Scheduling");
+                System.out.println("  [4] Test AG Scheduling");
+                System.out.println("  [5] Run ALL Tests");
+                System.out.println("  [0] Exit");
+                System.out.println("----------------------------------------");
+                System.out.print("Enter your choice: ");
+
+                String input = scanner.nextLine();
+                
+                switch (input) {
+                    case "1": runBatch(testFiles, "SJF"); break;
+                    case "2": runBatch(testFiles, "RR"); break;
+                    case "3": runBatch(testFiles, "Priority"); break;
+                    case "4": runBatch(testFiles, "AG"); break;
+                    case "5": runBatch(testFiles, "ALL"); break;
+                    case "0": 
+                        System.out.println("Goodbye!");
+                        return;
+                    default:
+                        System.out.println("Invalid choice, please try again.");
+                }
+                
+                System.out.println("\nPress [ENTER] to return to menu...");
+                scanner.nextLine();
+            }
         }
     }
 
