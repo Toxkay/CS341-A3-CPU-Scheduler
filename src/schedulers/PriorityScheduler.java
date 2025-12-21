@@ -17,7 +17,7 @@ public class PriorityScheduler {
     private static class ProcessState {
         Process p;
         int currentPriority;
-        int timeInReadyQueue = 0;
+        int ageTimer = 0;
         int inputOrder;
 
         ProcessState(Process p, int inputOrder) {
@@ -59,7 +59,7 @@ public class PriorityScheduler {
         while (completed < numProcesses) {
             while (!arrivePool.isEmpty() && arrivePool.get(0).p.arrivalTime <= time) {
                 ProcessState ps = arrivePool.remove(0);
-                ps.timeInReadyQueue = 0;
+                ps.ageTimer = 0;
                 readyQueue.add(ps);
             }
 
@@ -89,7 +89,7 @@ public class PriorityScheduler {
                         current.p.isCompleted = true;
                         completed++;
                     } else {
-                        current.timeInReadyQueue = 0;
+                        current.ageTimer = 0;
                         readyQueue.add(current);
                     }
 
@@ -98,23 +98,23 @@ public class PriorityScheduler {
 
                     ProcessState pending = readyQueue.poll();
                     if (pending != null) {
-                        pending.timeInReadyQueue = 0;
+                        pending.ageTimer = 0;
 
                         for (int i = 0; i < contextSwitch; i++) {
                             time++;
 
-                            pending.timeInReadyQueue++;
-                            if (agingInterval > 0 && pending.timeInReadyQueue >= agingInterval) {
+                            pending.ageTimer++;
+                            if (agingInterval > 0 && pending.ageTimer >= agingInterval) {
                                 pending.currentPriority = Math.max(1, pending.currentPriority - 1);
                                 pending.p.priority = pending.currentPriority;
-                                pending.timeInReadyQueue = 0;
+                                pending.ageTimer = 0;
                             }
 
                             applyAging(readyQueue);
 
                             while (!arrivePool.isEmpty() && arrivePool.get(0).p.arrivalTime <= time) {
                                 ProcessState ps = arrivePool.remove(0);
-                                ps.timeInReadyQueue = 0;
+                                ps.ageTimer = 0;
                                 readyQueue.add(ps);
                             }
                         }
@@ -136,18 +136,18 @@ public class PriorityScheduler {
                                 for (int i = 0; i < contextSwitch; i++) {
                                     time++;
 
-                                    pending.timeInReadyQueue++;
-                                    if (agingInterval > 0 && pending.timeInReadyQueue >= agingInterval) {
+                                    pending.ageTimer++;
+                                    if (agingInterval > 0 && pending.ageTimer >= agingInterval) {
                                         pending.currentPriority = Math.max(1, pending.currentPriority - 1);
                                         pending.p.priority = pending.currentPriority;
-                                        pending.timeInReadyQueue = 0;
+                                        pending.ageTimer = 0;
                                     }
 
                                     applyAging(readyQueue);
 
                                     while (!arrivePool.isEmpty() && arrivePool.get(0).p.arrivalTime <= time) {
                                         ProcessState ps = arrivePool.remove(0);
-                                        ps.timeInReadyQueue = 0;
+                                        ps.ageTimer = 0;
                                         readyQueue.add(ps);
                                     }
                                 }
@@ -155,13 +155,13 @@ public class PriorityScheduler {
                         }
 
                         current = pending;
-                        current.timeInReadyQueue = 0;
+                        current.ageTimer = 0;
                         executionOrder.add(current.p.name);
                     }
                 }
             } else if (!readyQueue.isEmpty()) {
                 current = readyQueue.poll();
-                current.timeInReadyQueue = 0;
+                current.ageTimer = 0;
                 executionOrder.add(current.p.name);
             } else {
                 time++;
@@ -184,12 +184,12 @@ public class PriorityScheduler {
         List<ProcessState> temp = new ArrayList<>();
         while (!queue.isEmpty()) {
             ProcessState ps = queue.poll();
-            ps.timeInReadyQueue++;
+            ps.ageTimer++;
 
-            if (ps.timeInReadyQueue >= agingInterval) {
+            if (ps.ageTimer >= agingInterval) {
                 ps.currentPriority = Math.max(1, ps.currentPriority - 1);
                 ps.p.priority = ps.currentPriority;
-                ps.timeInReadyQueue = 0;
+                ps.ageTimer = 0;
             }
             temp.add(ps);
         }
