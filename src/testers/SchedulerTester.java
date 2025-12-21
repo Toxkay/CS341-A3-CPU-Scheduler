@@ -244,8 +244,9 @@ public class SchedulerTester {
 
         // B. Verify Details Table
         System.out.println("\n2. Process Details:");
-        System.out.printf("   %-5s | %-12s | %-12s | %-20s | %s%n", "PID", "Wait Time", "Turnaround", "Quantum Hist.", "Status");
-        System.out.println("   ----------------------------------------------------------------------------");
+        System.out.printf("   %-5s | %-12s | %-12s | %-12s | %-20s | %s%n",
+            "PID", "Wait Time", "Turnaround", "Completion", "Quantum Hist.", "Status");
+        System.out.println("   -----------------------------------------------------------------------------------");
 
         // Sort for consistent display
         actualProcs.sort(Comparator.comparing(p -> p.name));
@@ -267,6 +268,7 @@ public class SchedulerTester {
             // Format strings for table
             String wtStr = String.format("%d (Ex:%d)", p.waitingTime, exp.wt);
             String tatStr = String.format("%d (Ex:%d)", p.turnaroundTime, exp.tat);
+            String compStr = String.valueOf(p.completionTime);
             String histStr = exp.history.isEmpty() ? "-" : "Ex:" + exp.history;
 
             if (pPass) {
@@ -275,8 +277,8 @@ public class SchedulerTester {
                 histStr = exp.history.isEmpty() ? "-" : p.quantumHistory.toString();
             }
 
-            System.out.printf("   %-5s | %-12s | %-12s | %-20s | %s%n", 
-                p.name, wtStr, tatStr, histStr, status);
+            System.out.printf("   %-5s | %-12s | %-12s | %-12s | %-20s | %s%n",
+                    p.name, wtStr, tatStr, compStr, histStr, status);
         }
 
         // C. Verify Averages
